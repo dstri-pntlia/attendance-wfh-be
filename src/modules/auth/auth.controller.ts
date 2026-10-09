@@ -4,6 +4,7 @@ import {
   Get,
   HttpCode,
   HttpStatus,
+  Patch,
   Post,
   Req,
   Res,
@@ -30,7 +31,12 @@ import {
 } from './decorators/auth.decorators.js';
 import { LoginThrottlerGuard } from './guards/login-throttler.guard.js';
 import { AuthService, type AuthSession } from './auth.service.js';
-import { LoginDto, LoginResponseDto, UserResponseDto } from './dto/auth.dto.js';
+import {
+  ChangePasswordDto,
+  LoginDto,
+  LoginResponseDto,
+  UserResponseDto,
+} from './dto/auth.dto.js';
 
 export const REFRESH_COOKIE = 'refresh_token';
 export const REFRESH_COOKIE_PATH = '/api/v1/auth';
@@ -38,6 +44,7 @@ export const REFRESH_COOKIE_PATH = '/api/v1/auth';
 const MINUTE_MS = 60_000;
 export const LOGIN_RATE_LIMIT = { limit: 5, ttl: MINUTE_MS };
 export const REFRESH_RATE_LIMIT = { limit: 20, ttl: MINUTE_MS };
+export const PASSWORD_CHANGE_RATE_LIMIT = { limit: 5, ttl: MINUTE_MS };
 
 @ApiTags('Auth')
 @Controller('auth')
@@ -129,6 +136,38 @@ export class AuthController {
   @ApiErrorResponses([HttpStatus.UNAUTHORIZED, ErrorCode.UNAUTHENTICATED])
   me(@CurrentUser() user: AuthUser): Promise<UserResponseDto> {
     return this.auth.getSessionUser(user.id);
+  }
+
+  @Patch('me/password')
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: PASSWORD_CHANGE_RATE_LIMIT })
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Change the current user’s password',
+    description:
+      'Invalidates every existing access and refresh token and clears the refresh cookie; ' +
+      'the client must log in again. A wrong current password returns `CURRENT_PASSWORD_INCORRECT`, ' +
+      'a new password that breaks the policy or equals the current one returns `VALIDATION_FAILED`. ' +
+      'Rate limited to 5 attempts per minute per IP.',
+  })
+  @ApiNoContentResponse()
+  @ApiErrorResponses(
+    HttpStatus.BAD_REQUEST,
+    [HttpStatus.UNAUTHORIZED, ErrorCode.UNAUTHENTICATED],
+    HttpStatus.TOO_MANY_REQUESTS,
+  )
+  async changePassword(
+    @CurrentUser() user: AuthUser,
+    @Body() dto: ChangePasswordDto,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<void> {
+    await this.auth.changePassword(
+      user.id,
+      dto.currentPassword,
+      dto.newPassword,
+    );
+    res.clearCookie(REFRESH_COOKIE, this.cookieOptions());
   }
 
   private respond(res: Response, session: AuthSession): LoginResponseDto {

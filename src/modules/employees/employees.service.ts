@@ -92,6 +92,10 @@ export class EmployeesService {
     return EmployeeResponseDto.from(employee);
   }
 
+  countActive(): Promise<number> {
+    return this.employees.countBy({ status: EmployeeStatus.ACTIVE });
+  }
+
   findSummaryByUserId(userId: string): Promise<EmployeeSummary | null> {
     return this.employees.findOne({
       where: { userId },

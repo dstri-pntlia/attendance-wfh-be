@@ -19,6 +19,7 @@ import {
   ApiConsumes,
   ApiCreatedResponse,
   ApiOkResponse,
+  ApiOperation,
   ApiProduces,
   ApiTags,
 } from '@nestjs/swagger';
@@ -40,6 +41,8 @@ import { AttendanceService } from './attendance.service.js';
 import {
   AttendanceQueryDto,
   AttendanceResponseDto,
+  AttendanceSummaryQueryDto,
+  AttendanceSummaryResponseDto,
   CheckInDto,
   CheckOutDto,
   MyAttendanceQueryDto,
@@ -133,6 +136,17 @@ export class AttendanceController {
   @ApiErrorResponses(400, 403)
   findAll(@Query() query: AttendanceQueryDto) {
     return this.attendanceService.findAll(query);
+  }
+
+  @Get('summary')
+  @Roles(UserRole.HR_ADMIN)
+  @ApiOperation({ summary: 'Attendance counts for one work date' })
+  @ApiOkResponse({ type: AttendanceSummaryResponseDto })
+  @ApiErrorResponses(400, 403)
+  getSummary(
+    @Query() query: AttendanceSummaryQueryDto,
+  ): Promise<AttendanceSummaryResponseDto> {
+    return this.attendanceService.getSummary(query.date);
   }
 
   @Get(':id')

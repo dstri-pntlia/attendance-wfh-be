@@ -72,6 +72,10 @@ function createMocks() {
     skip: vi.fn().mockReturnThis(),
     take: vi.fn().mockReturnThis(),
     getManyAndCount: vi.fn().mockResolvedValue([[], 0]),
+    select: vi.fn().mockReturnThis(),
+    addSelect: vi.fn().mockReturnThis(),
+    groupBy: vi.fn().mockReturnThis(),
+    getRawMany: vi.fn().mockResolvedValue([]),
   };
   const attendances = {
     existsBy: vi.fn().mockResolvedValue(false),
@@ -96,6 +100,7 @@ function createMocks() {
     delete: vi.fn().mockResolvedValue(undefined),
   };
   const employees = {
+    countActive: vi.fn().mockResolvedValue(0),
     findSummaryByUserId: vi.fn().mockResolvedValue({
       id: EMPLOYEE_ID,
       employeeNumber: 'EMP-0001',
@@ -770,6 +775,62 @@ describe('AttendanceService', () => {
       await service.getPhoto(ATTENDANCE_ID, owner);
 
       expect(mocks.storage.openStream).toHaveBeenCalledWith('abc.jpeg');
+    });
+  });
+
+  describe('getSummary', () => {
+    it('counts each status and the active employees who have not checked in', async () => {
+      mocks.employees.countActive.mockResolvedValue(10);
+      mocks.qb.getRawMany.mockResolvedValue([
+        { status: AttendanceStatus.ON_TIME, count: 5 },
+        { status: AttendanceStatus.LATE, count: 2 },
+      ]);
+
+      await expect(service.getSummary('2026-10-06')).resolves.toEqual({
+        date: '2026-10-06',
+        activeEmployees: 10,
+        checkedIn: 7,
+        onTime: 5,
+        late: 2,
+        notCheckedIn: 3,
+      });
+      expect(mocks.qb.where).toHaveBeenCalledWith(
+        'attendance.workDate = :workDate',
+        { workDate: '2026-10-06' },
+      );
+    });
+
+    it('reports zeros for a date without attendance', async () => {
+      mocks.employees.countActive.mockResolvedValue(4);
+
+      await expect(service.getSummary('2020-01-01')).resolves.toEqual({
+        date: '2020-01-01',
+        activeEmployees: 4,
+        checkedIn: 0,
+        onTime: 0,
+        late: 0,
+        notCheckedIn: 4,
+      });
+    });
+
+    it('never reports a negative notCheckedIn', async () => {
+      mocks.employees.countActive.mockResolvedValue(1);
+      mocks.qb.getRawMany.mockResolvedValue([
+        { status: AttendanceStatus.ON_TIME, count: 3 },
+      ]);
+
+      const summary = await service.getSummary('2026-10-06');
+
+      expect(summary.checkedIn).toBe(3);
+      expect(summary.notCheckedIn).toBe(0);
+    });
+
+    it('defaults to today in Jakarta', async () => {
+      at('2026-10-06T17:30:00.000Z');
+
+      const summary = await service.getSummary();
+
+      expect(summary.date).toBe('2026-10-07');
     });
   });
 });

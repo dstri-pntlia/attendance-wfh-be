@@ -276,3 +276,60 @@ export class TodayAttendanceResponseDto {
   @ApiProperty({ type: AttendanceResponseDto, nullable: true })
   attendance: AttendanceResponseDto | null;
 }
+
+export class AttendanceSummaryQueryDto {
+  @ApiPropertyOptional({
+    example: '2026-10-06',
+    format: 'date',
+    description: 'Defaults to today in the business time zone.',
+  })
+  @IsOptional()
+  @IsWorkDate()
+  date?: string;
+}
+
+export type AttendanceStatusCounts = Record<AttendanceStatus, number>;
+
+export class AttendanceSummaryResponseDto {
+  @ApiProperty({ example: '2026-10-06', format: 'date' })
+  date: string;
+
+  @ApiProperty({
+    example: 42,
+    description: 'Employees whose status is ACTIVE now.',
+  })
+  activeEmployees: number;
+
+  @ApiProperty({ example: 37 })
+  checkedIn: number;
+
+  @ApiProperty({ example: 31 })
+  onTime: number;
+
+  @ApiProperty({ example: 6 })
+  late: number;
+
+  @ApiProperty({
+    example: 5,
+    description: 'activeEmployees minus checkedIn, never below 0.',
+  })
+  notCheckedIn: number;
+
+  static from(
+    date: string,
+    activeEmployees: number,
+    counts: AttendanceStatusCounts,
+  ): AttendanceSummaryResponseDto {
+    const onTime = counts[AttendanceStatus.ON_TIME];
+    const late = counts[AttendanceStatus.LATE];
+    const checkedIn = onTime + late;
+    return {
+      date,
+      activeEmployees,
+      checkedIn,
+      onTime,
+      late,
+      notCheckedIn: Math.max(0, activeEmployees - checkedIn),
+    };
+  }
+}

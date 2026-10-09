@@ -88,6 +88,23 @@ export class AuthService {
     return this.issueSession(user);
   }
 
+  async changePassword(
+    userId: string,
+    currentPassword: string,
+    newPassword: string,
+  ): Promise<void> {
+    const user = await this.users.findByIdWithPasswordHash(userId);
+    if (!user) throw new UnauthorizedException();
+    if (!(await verifyPassword(user.passwordHash, currentPassword))) {
+      throw new AppException(
+        HttpStatus.BAD_REQUEST,
+        ErrorCode.CURRENT_PASSWORD_INCORRECT,
+        'The current password is incorrect.',
+      );
+    }
+    await this.users.changePasswordAndRevokeTokens(user.id, newPassword);
+  }
+
   async getSessionUser(userId: string): Promise<UserResponseDto> {
     const user = await this.users.findById(userId);
     if (!user) throw new UnauthorizedException();

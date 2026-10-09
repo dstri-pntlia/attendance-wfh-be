@@ -34,6 +34,8 @@ import {
   ATTENDANCE_SORT_FIELDS,
   type AttendanceQueryDto,
   AttendanceResponseDto,
+  type AttendanceStatusCounts,
+  AttendanceSummaryResponseDto,
   DEFAULT_ATTENDANCE_SORT,
   DEFAULT_MONITORING_SORT,
   MONITORING_SORT_FIELDS,
@@ -286,6 +288,28 @@ export class AttendanceService {
       query.limit,
       total,
     );
+  }
+
+  async getSummary(date?: string): Promise<AttendanceSummaryResponseDto> {
+    const workDate = date ?? toWorkDate(new Date(), this.config.appTimezone);
+    const [activeEmployees, rows] = await Promise.all([
+      this.employees.countActive(),
+      this.attendances
+        .createQueryBuilder('attendance')
+        .select('attendance.status', 'status')
+        .addSelect('COUNT(*)::int', 'count')
+        .where('attendance.workDate = :workDate', { workDate })
+        .groupBy('attendance.status')
+        .getRawMany<{ status: AttendanceStatus; count: number }>(),
+    ]);
+
+    const counts: AttendanceStatusCounts = {
+      [AttendanceStatus.ON_TIME]: 0,
+      [AttendanceStatus.LATE]: 0,
+    };
+    for (const row of rows) counts[row.status] = row.count;
+
+    return AttendanceSummaryResponseDto.from(workDate, activeEmployees, counts);
   }
 
   async findOne(id: string, actor: AuthUser): Promise<AttendanceResponseDto> {

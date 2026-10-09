@@ -1,8 +1,10 @@
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import request from 'supertest';
 import type { Response } from 'supertest';
+import { EmployeeStatus } from '../src/core/database/entities/employee.entity.js';
 import {
   DEMO_EMPLOYEE_PASSWORD,
+  DEMO_EMPLOYEES,
   HR_ADMIN,
 } from '../src/core/database/seeds/seed-data.js';
 import { runSeed } from '../src/core/database/seeds/seed.js';
@@ -17,6 +19,10 @@ const PNG = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
   'base64',
 );
+
+const ACTIVE_EMPLOYEES = DEMO_EMPLOYEES.filter(
+  (e) => e.status === EmployeeStatus.ACTIVE,
+).length;
 
 function expectError(res: Response, statusCode: number, code: string): void {
   expect(res.status).toBe(statusCode);
@@ -123,13 +129,58 @@ describe('WFH attendance API (e2e)', () => {
       );
     });
 
-    it('requires a token and the right role', async () => {
+    it.each(['/employees', '/attendances/summary'])(
+      'requires a token and the HR role for %s',
+      async (path) => {
+        expectError(
+          await request(http).get(`/api/v1${path}`),
+          401,
+          'UNAUTHENTICATED',
+        );
+        expectError(await as(budiToken).get(path), 403, 'FORBIDDEN');
+      },
+    );
+
+    it('changes the password and ends every existing session', async () => {
+      const email = 'dewi@example.com';
+      const session = await login(email, DEMO_EMPLOYEE_PASSWORD).expect(200);
+      const token = session.body.accessToken as string;
+      const oldCookie = session.headers['set-cookie'] as unknown as string[];
+
       expectError(
-        await request(http).get('/api/v1/employees'),
-        401,
-        'UNAUTHENTICATED',
+        await as(token).patch('/auth/me/password').send({
+          currentPassword: 'WrongSecret1',
+          newPassword: 'NewSecret456',
+        }),
+        400,
+        'CURRENT_PASSWORD_INCORRECT',
       );
-      expectError(await as(budiToken).get('/employees'), 403, 'FORBIDDEN');
+      const same = await as(token).patch('/auth/me/password').send({
+        currentPassword: DEMO_EMPLOYEE_PASSWORD,
+        newPassword: DEMO_EMPLOYEE_PASSWORD,
+      });
+      expectError(same, 400, 'VALIDATION_FAILED');
+      expect(same.body.message).toBe(
+        'newPassword must differ from currentPassword',
+      );
+
+      await as(token)
+        .patch('/auth/me/password')
+        .send({
+          currentPassword: DEMO_EMPLOYEE_PASSWORD,
+          newPassword: 'NewSecret456',
+        })
+        .expect(204);
+
+      expectError(await as(token).get('/auth/me'), 401, 'UNAUTHENTICATED');
+      expectError(
+        await request(http)
+          .post('/api/v1/auth/refresh')
+          .set('Cookie', oldCookie),
+        401,
+        'INVALID_REFRESH_TOKEN',
+      );
+      await login(email, 'NewSecret456').expect(200);
     });
   });
 
@@ -245,6 +296,38 @@ describe('WFH attendance API (e2e)', () => {
         .expect(200);
       expect(photo.headers['content-type']).toBe('image/png');
       expect(Buffer.compare(photo.body as Buffer, PNG)).toBe(0);
+    });
+
+    it('summarises today, including the new check-in', async () => {
+      const res = await as(hrToken).get('/attendances/summary').expect(200);
+      expect(res.body).toEqual({
+        date: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+        activeEmployees: ACTIVE_EMPLOYEES + 1,
+        checkedIn: 1,
+        onTime: expect.any(Number),
+        late: expect.any(Number),
+        notCheckedIn: ACTIVE_EMPLOYEES,
+      });
+      expect(res.body.onTime + res.body.late).toBe(1);
+    });
+
+    it('summarises a date without attendance as zeros', async () => {
+      const res = await as(hrToken)
+        .get('/attendances/summary?date=2020-01-01')
+        .expect(200);
+      expect(res.body).toEqual({
+        date: '2020-01-01',
+        activeEmployees: ACTIVE_EMPLOYEES + 1,
+        checkedIn: 0,
+        onTime: 0,
+        late: 0,
+        notCheckedIn: ACTIVE_EMPLOYEES + 1,
+      });
+      expectError(
+        await as(hrToken).get('/attendances/summary?date=2026-13-01'),
+        400,
+        'VALIDATION_FAILED',
+      );
     });
 
     it('cuts off a deactivated employee immediately', async () => {

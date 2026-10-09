@@ -42,6 +42,14 @@ export class UsersService {
       .getOne();
   }
 
+  findByIdWithPasswordHash(id: string): Promise<User | null> {
+    return this.users
+      .createQueryBuilder('user')
+      .addSelect('user.passwordHash')
+      .where('user.id = :id', { id })
+      .getOne();
+  }
+
   async create(input: CreateUserInput, manager?: EntityManager): Promise<User> {
     const repo = this.repo(manager);
     const user = repo.create({
@@ -68,6 +76,19 @@ export class UsersService {
     await this.repo(manager).update(
       { id },
       { passwordHash: await hashPassword(newPassword) },
+    );
+  }
+
+  async changePasswordAndRevokeTokens(
+    id: string,
+    newPassword: string,
+  ): Promise<void> {
+    await this.users.update(
+      { id },
+      {
+        passwordHash: await hashPassword(newPassword),
+        tokenVersion: () => '"token_version" + 1',
+      },
     );
   }
 

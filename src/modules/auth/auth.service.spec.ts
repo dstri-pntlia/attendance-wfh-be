@@ -37,6 +37,8 @@ describe('AuthService', () => {
   const users = {
     findByEmailWithPasswordHash: vi.fn(),
     findById: vi.fn(),
+    findByIdWithPasswordHash: vi.fn(),
+    changePasswordAndRevokeTokens: vi.fn(),
     recordLogin: vi.fn(),
   };
   const employees = { findSummaryByUserId: vi.fn() };
@@ -364,6 +366,42 @@ describe('AuthService', () => {
       await expect(service.getSessionUser('gone')).rejects.toBeInstanceOf(
         UnauthorizedException,
       );
+    });
+  });
+
+  describe('changePassword', () => {
+    it('stores the new password and revokes tokens when the current one matches', async () => {
+      users.findByIdWithPasswordHash.mockResolvedValue(user());
+
+      await service.changePassword(USER_ID, PASSWORD, 'NewSecret456');
+
+      expect(users.changePasswordAndRevokeTokens).toHaveBeenCalledWith(
+        USER_ID,
+        'NewSecret456',
+      );
+    });
+
+    it('rejects a wrong current password without changing anything', async () => {
+      users.findByIdWithPasswordHash.mockResolvedValue(user());
+
+      const error = await service
+        .changePassword(USER_ID, 'WrongSecret1', 'NewSecret456')
+        .catch((e: unknown) => e);
+
+      expect(error).toBeInstanceOf(AppException);
+      expect(error).toMatchObject({
+        code: 'CURRENT_PASSWORD_INCORRECT',
+        status: 400,
+      });
+      expect(users.changePasswordAndRevokeTokens).not.toHaveBeenCalled();
+    });
+
+    it('answers 401 when the user no longer exists', async () => {
+      users.findByIdWithPasswordHash.mockResolvedValue(null);
+
+      await expect(
+        service.changePassword(USER_ID, PASSWORD, 'NewSecret456'),
+      ).rejects.toThrow(UnauthorizedException);
     });
   });
 });

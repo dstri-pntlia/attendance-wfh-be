@@ -20,6 +20,11 @@ import { PaginationQueryDto } from '../../../common/pagination/pagination-query.
 import { IsSort } from '../../../common/pagination/sort.js';
 import { isCalendarDate } from '../../../common/utils/time.util.js';
 import {
+  IsPasswordPolicy,
+  PASSWORD_MAX_LENGTH,
+  PASSWORD_MIN_LENGTH,
+} from '../../../common/validation/password.validators.js';
+import {
   type Employee,
   EmployeeStatus,
 } from '../../../core/database/entities/employee.entity.js';
@@ -72,6 +77,7 @@ export class CreateEmployeeDto {
   email: string;
 
   @ApiPropertyOptional({
+    type: String,
     example: '081298765432',
     nullable: true,
     minLength: 8,
@@ -99,12 +105,12 @@ export class CreateEmployeeDto {
   @IsHireDate()
   hireDate: string;
 
-  @ApiProperty({ example: 'Welcome123', minLength: 8, maxLength: 128 })
-  @IsString()
-  @Length(8, 128)
-  @Matches(/^(?=.*[A-Za-z])(?=.*\d)/, {
-    message: 'password must contain at least one letter and one digit',
+  @ApiProperty({
+    example: 'Welcome123',
+    minLength: PASSWORD_MIN_LENGTH,
+    maxLength: PASSWORD_MAX_LENGTH,
   })
+  @IsPasswordPolicy()
   password: string;
 }
 

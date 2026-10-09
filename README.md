@@ -153,6 +153,7 @@ Departments: `ENG` Engineering, `HR` Human Resources, `FIN` Finance, `OPS` Opera
 | `POST /api/v1/auth/refresh` | Uses the cookie; returns a new access token and sets a new refresh token. Fails if the user was deactivated or their password changed. Limit: 20 per minute per IP. |
 | `POST /api/v1/auth/logout` | Clears the cookie; `204`, idempotent, no bearer needed. |
 | `GET /api/v1/auth/me` | Current user (bearer token). |
+| `PATCH /api/v1/auth/me/password` | `{ currentPassword, newPassword }` → `204`; ends every session and clears the cookie. Limit: 5 per minute per IP. |
 
 Every other route requires `Authorization: Bearer <accessToken>` unless marked `@Public()`. Use `@Roles(UserRole.HR_ADMIN)` to restrict a route, and `@CurrentUser()` to read the caller. The access token (HS256, claims `sub`, `role`, `ver`) is checked against the database on each request, so deactivating a user or bumping `token_version` takes effect immediately.
 
