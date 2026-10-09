@@ -1,0 +1,17 @@
+.git
+.github
+node_modules
+dist
+coverage
+test
+uploads
+
+.env
+.env.*
+!.env.example
+
+*.tsbuildinfo
+*.log
+.DS_Store
+.vscode
+.idea
