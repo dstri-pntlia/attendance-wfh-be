@@ -15,7 +15,6 @@ import {
   ApiCookieAuth,
   ApiNoContentResponse,
   ApiOkResponse,
-  ApiOperation,
   ApiTags,
 } from '@nestjs/swagger';
 import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
@@ -59,12 +58,6 @@ export class AuthController {
   @Throttle({ default: LOGIN_RATE_LIMIT })
   @Post('login')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({
-    summary: 'Log in with email and password',
-    description:
-      'Sets the `refresh_token` cookie (HttpOnly, SameSite=Lax, Path=/api/v1/auth). ' +
-      'Every failure returns the same `INVALID_CREDENTIALS` error. Rate limited to 5 attempts per minute per IP and email.',
-  })
   @ApiOkResponse({ type: LoginResponseDto })
   @ApiErrorResponses(
     [HttpStatus.UNAUTHORIZED, ErrorCode.INVALID_CREDENTIALS],
@@ -84,13 +77,6 @@ export class AuthController {
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
   @ApiCookieAuth(REFRESH_COOKIE)
-  @ApiOperation({
-    summary: 'Get a new access token (and a new refresh token) from the cookie',
-    description:
-      'Uses the `refresh_token` cookie; no body. The refresh token is a signed JWT with no server-side record: ' +
-      'it stops working when it expires, or when the user is deactivated or their password changes. ' +
-      'A rejected token clears the cookie.',
-  })
   @ApiOkResponse({ type: LoginResponseDto })
   @ApiErrorResponses(
     [HttpStatus.UNAUTHORIZED, ErrorCode.INVALID_REFRESH_TOKEN],
@@ -118,12 +104,6 @@ export class AuthController {
   @Post('logout')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiCookieAuth(REFRESH_COOKIE)
-  @ApiOperation({
-    summary: 'Clear the refresh token cookie',
-    description:
-      'Idempotent; works without a bearer token. Refresh tokens are stateless, so this only ' +
-      'removes the cookie: a copy of the token stays valid until it expires.',
-  })
   @ApiNoContentResponse()
   logout(@Res({ passthrough: true }) res: Response): void {
     res.clearCookie(REFRESH_COOKIE, this.cookieOptions());
@@ -131,7 +111,6 @@ export class AuthController {
 
   @Get('me')
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'The current user' })
   @ApiOkResponse({ type: UserResponseDto })
   @ApiErrorResponses([HttpStatus.UNAUTHORIZED, ErrorCode.UNAUTHENTICATED])
   me(@CurrentUser() user: AuthUser): Promise<UserResponseDto> {
@@ -143,14 +122,6 @@ export class AuthController {
   @Throttle({ default: PASSWORD_CHANGE_RATE_LIMIT })
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiBearerAuth()
-  @ApiOperation({
-    summary: 'Change the current user’s password',
-    description:
-      'Invalidates every existing access and refresh token and clears the refresh cookie; ' +
-      'the client must log in again. A wrong current password returns `CURRENT_PASSWORD_INCORRECT`, ' +
-      'a new password that breaks the policy or equals the current one returns `VALIDATION_FAILED`. ' +
-      'Rate limited to 5 attempts per minute per IP.',
-  })
   @ApiNoContentResponse()
   @ApiErrorResponses(
     HttpStatus.BAD_REQUEST,
@@ -181,7 +152,7 @@ export class AuthController {
   private cookieOptions(): CookieOptions {
     return {
       httpOnly: true,
-      sameSite: 'lax',
+      sameSite: this.config.cookieSecure ? 'none' : 'lax',
       secure: this.config.cookieSecure,
       path: REFRESH_COOKIE_PATH,
     };

@@ -99,7 +99,7 @@ describe('WFH attendance API (e2e)', () => {
         },
       });
       expect(res.headers['set-cookie']?.[0]).toMatch(
-        /^refresh_token=.+HttpOnly/,
+        /^refresh_token=.+HttpOnly; SameSite=Lax/,
       );
     });
 

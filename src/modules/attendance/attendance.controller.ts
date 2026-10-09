@@ -19,7 +19,6 @@ import {
   ApiConsumes,
   ApiCreatedResponse,
   ApiOkResponse,
-  ApiOperation,
   ApiProduces,
   ApiTags,
 } from '@nestjs/swagger';
@@ -140,7 +139,6 @@ export class AttendanceController {
 
   @Get('summary')
   @Roles(UserRole.HR_ADMIN)
-  @ApiOperation({ summary: 'Attendance counts for one work date' })
   @ApiOkResponse({ type: AttendanceSummaryResponseDto })
   @ApiErrorResponses(400, 403)
   getSummary(
