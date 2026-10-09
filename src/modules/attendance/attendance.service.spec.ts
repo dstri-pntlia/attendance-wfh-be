@@ -173,6 +173,21 @@ describe('AttendanceService', () => {
     });
 
     it.each([
+      ['2026-10-06T16:59:00.000Z', 'attendance/2026/10/06'],
+      ['2026-10-06T17:00:00.000Z', 'attendance/2026/10/07'],
+    ])('stores %s under %s, following the work date', async (iso, expected) => {
+      at(iso);
+
+      await service.checkIn(owner, { photo: JPEG });
+
+      expect(mocks.storage.save).toHaveBeenCalledWith(
+        JPEG,
+        'image/jpeg',
+        expected,
+      );
+    });
+
+    it.each([
       ['2026-10-06T01:59:00.000Z', 'ON_TIME', '08:59 WIB'],
       ['2026-10-06T02:00:00.000Z', 'ON_TIME', '09:00 WIB exactly'],
       ['2026-10-06T02:01:00.000Z', 'LATE', '09:01 WIB'],
@@ -332,7 +347,11 @@ describe('AttendanceService', () => {
 
       await service.checkOut(owner, { photo: JPEG });
 
-      expect(mocks.storage.save).toHaveBeenCalledWith(JPEG, 'image/jpeg');
+      expect(mocks.storage.save).toHaveBeenCalledWith(
+        JPEG,
+        'image/jpeg',
+        'attendance/2026/10/06',
+      );
       const saved = lastSaved();
       expect(saved.checkOutPhotoId).toBe(PHOTO_ID);
     });

@@ -26,6 +26,12 @@ export enum NodeEnv {
   Production = 'production',
 }
 
+export enum CookieSameSite {
+  Lax = 'lax',
+  None = 'none',
+  Strict = 'strict',
+}
+
 export const DATABASE_URL_PATTERN = /^postgres(ql)?:\/\/\S+$/;
 
 export const MAX_UPLOAD_BYTES = 5_242_880;

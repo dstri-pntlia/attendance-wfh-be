@@ -8,7 +8,11 @@ export interface SavedFile {
 }
 
 export abstract class StorageService {
-  abstract save(buffer: Buffer, mimeType: string): Promise<SavedFile>;
+  abstract save(
+    buffer: Buffer,
+    mimeType: string,
+    prefix?: string,
+  ): Promise<SavedFile>;
   abstract openStream(storageKey: string): Promise<Readable>;
   abstract delete(storageKey: string): Promise<void>;
 }

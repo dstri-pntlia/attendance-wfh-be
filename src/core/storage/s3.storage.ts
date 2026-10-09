@@ -29,8 +29,13 @@ export class S3Storage extends StorageService {
     });
   }
 
-  async save(buffer: Buffer, mimeType: string): Promise<SavedFile> {
-    const storageKey = `${randomUUID()}.${mimeType.split('/')[1]}`;
+  async save(
+    buffer: Buffer,
+    mimeType: string,
+    prefix?: string,
+  ): Promise<SavedFile> {
+    const name = `${randomUUID()}.${mimeType.split('/')[1]}`;
+    const storageKey = prefix ? `${prefix}/${name}` : name;
 
     await this.client.send(
       new PutObjectCommand({

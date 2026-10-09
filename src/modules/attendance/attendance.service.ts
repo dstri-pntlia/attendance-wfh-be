@@ -51,6 +51,10 @@ export interface PhotoStream {
   sizeBytes: number;
 }
 
+function photoPrefix(workDate: string): string {
+  return `attendance/${workDate.replaceAll('-', '/')}`;
+}
+
 export interface CheckInInput {
   photo: Buffer;
   originalName?: string;
@@ -91,7 +95,11 @@ export class AttendanceService {
       throw this.alreadySubmitted();
     }
 
-    const saved = await this.storage.save(input.photo, mimeType);
+    const saved = await this.storage.save(
+      input.photo,
+      mimeType,
+      photoPrefix(workDate),
+    );
     try {
       const attendance = await this.dataSource.transaction(async (manager) => {
         const photo = await manager.save(
@@ -161,7 +169,11 @@ export class AttendanceService {
     }
 
     const saved = input.photo
-      ? await this.storage.save(input.photo, this.requireImage(input.photo))
+      ? await this.storage.save(
+          input.photo,
+          this.requireImage(input.photo),
+          photoPrefix(workDate),
+        )
       : null;
 
     try {
